@@ -1,0 +1,260 @@
+# We'll utilize the ARDUINO IDE "Arduino Integrated Development Environment" to put code on the Arduino UNO board.
+#IDE is a cross-platform (Windows, Mac OS X, Linux) application written in C and C++ functions. It's used to write and upload programs to Arduino-compatible boards.
+
+#include <SPI.h>
+#include <Ethernet.h>
+#include <NewPassword.h>
+#include <Keypad.h>
+#include <Servo.h>
+
+
+Servo myservo;  // create servo object to control a servo
+
+const byte ROWS = 4;
+const byte COLS = 4;
+char keys[ROWS][COLS] = {
+  {'1', '2', '3', 'A'},
+  {'4', '5', '6', 'B'},
+  {'7', '8', '9', 'C'},
+  {'*', '0', '#', 'D'}
+};
+byte rowPins[ROWS] = {A3, A2, A1, A0}; //connect to the row pinouts of the keypad
+byte colPins[COLS] = {4, 5, 6, 7}; //connect to the column pinouts of the keypad
+Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
+
+
+int pos = 0;
+byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+byte ip[] = { 192, 168, 100, 199 };//178
+byte gateway[] = { 192, 168, 100, 1 };
+byte subnet[] = { 255, 255, 255, 0 };
+EthernetServer server(80);
+String readString;
+int x, y, z, h;
+int Amman_bus = 50;
+int Irbid_bus = 20;
+int data_count = 0;
+char pass[16];
+NewPassword password = Password( pass );
+
+int Amman_parking, Irbid_parking;
+int LDR;
+
+void setup() {
+    Serial.begin(9600);
+  pinMode(8, INPUT);//Irbid
+  pinMode(2, INPUT);//Amman
+  // pinMode(3, INPUT);//LDR
+  myservo.attach(3);  // attaches the servo on pin 9 to the servo object
+
+  while (!Serial) {
+    ; // wait for serial port to connect. Needed for Leonardo only
+  }
+  // start the Ethernet connection and the server:
+  Ethernet.begin(mac, ip, gateway, subnet);
+  server.begin();
+  Serial.print("server is at ");
+  Serial.println(Ethernet.localIP());
+  keypad.addEventListener(keypadEvent); //add an event listener for this keypad
+  myservo.write(100);
+
+}
+
+void loop() {
+  Amman_parking = digitalRead(2);
+  Irbid_parking = digitalRead(8);
+  //LDR=digitalRead(3);
+
+  //Serial.println(LDR);
+  EthernetClient client = server.available();
+  if (client) {
+    while (client.connected()) {
+      if (client.available()) {
+        char c = client.read();
+
+        //read char by char HTTP request
+        if (readString.length() < 100) {
+          //store characters to string
+          readString += c;
+          //Serial.print(c);
+        }
+
+        //if HTTP request has ended
+        if (c == '\n') {
+          Serial.println(readString); //print to serial monitor for debuging
+
+          client.println("HTTP/1.1 200 OK"); //send new page
+          client.println("Content-Type: text/html");
+          client.println();
+          client.println("<HTML>");
+          client.println("<HEAD>");
+          client.println("<style>");
+          client.println("body {");
+          client.println("background-image: url('https://b2b.wien.info/resource/image/307748/19x10/1200/630/309fd450756020ba11453a90a23af6b7/22828847035A7218E806149EA13AB61D/reisebus.webp');}");
+          client.println("</style>");
+          client.println("<meta name='apple-mobile-web-app-capable' content='yes' />");
+          client.println("<meta name='apple-mobile-web-app-status-bar-style' content='black-translucent' />");
+          client.println("<link rel='stylesheet' type='text/css' href='https://randomnerdtutorials.com/ethernetcss.css' />");
+          client.println("<TITLE>Book your trip</TITLE>");
+          client.println("</HEAD>");
+          client.println("<BODY>");
+          //client.println("<h3 style=color:Tomato;>Hello World</h3>");
+
+          client.println("<H1 style=color:Tomato;>Book your trip</H1>");
+          client.println("<hr />");
+          client.println("<br />");
+          client.println("<H2>IRBID AT 7:00AM</H2>");
+          client.println("<br />");
+          client.println("<a href=\"/?button1on\"\">BOOK</a>");
+          //client.println("<a href=\"/?button1off\"\">Turn Off LED</a><br />");
+          client.println("<br />");
+          client.println("<br />");
+          //client.println("<br />");
+
+
+
+
+
+
+          delay(1);
+          if (readString.indexOf("?button1on") > 0) {
+            if (Irbid_parking == 0 && Irbid_bus > 1) {
+              x = random(9999);
+              Irbid_bus = Irbid_bus - 1;
+              client.print("<H3> Remaining: </H3>");
+              client.println(Irbid_bus);
+              client.print("<H4 style=color:white;>Pasword is:</H4>");
+              client.println(x);
+              Serial.print("x=");
+              Serial.println(x);
+              //client.println("Refresh: 5");  // refresh the page automatically every 5 sec
+
+              itoa(x, pass, 10);
+              Serial.print("pass");
+              Serial.print(pass);
+              client.println("<br />");
+            }
+
+            else if (Irbid_parking == 1 && Irbid_bus > 0) {
+              Irbid_bus = 20;
+              client.print("NOT Available");
+              client.println("<br />");
+            }
+
+            if (Irbid_bus <= 1) {
+              Irbid_bus = 0;
+              client.print("Full");
+              client.println("<br />");
+            }
+          }
+
+          client.print("<hr>");
+
+            client.print("<H2>AMMAN AT 4:00AM</H2>");
+
+
+          client.println("<br />");
+
+          client.println("<a href=\"/?button1off\"\">BOOK</a>");
+          client.println("<br />");
+
+
+
+
+
+
+
+          if (readString.indexOf("?button1off") > 0) {
+            if (Amman_parking == 0 && Amman_bus > 1) {
+              y = random(9999);
+              Amman_bus = Amman_bus - 1;
+              client.print("<H3> Remaining: </H3>");
+              client.println(Amman_bus);
+              client.print("<H4 style=color:white;>Pasword is:</H4>");
+              client.println(y);
+
+              itoa(y, pass, 10);
+              Serial.print("pass");
+              Serial.print(pass);
+              client.println("<br />");
+            }
+            else if (Amman_parking == 1 && Amman_bus > 0) {
+              client.println("<br />");
+              Amman_bus = 50;
+              client.print("NOT Available");
+              client.println("<br />");
+            }
+            if (Amman_bus <= 1) {
+              Amman_bus = 0;
+              client.println("<br />");
+
+              client.print("Full");
+              client.println("<br />");
+            }
+
+          }
+          client.print("<hr>");
+
+         readString = "";
+          Serial.print("x    ");
+          Serial.println(x);
+          Serial.print("y   ");
+          Serial.println(y);
+
+          client.println("</BODY>");
+          client.println("</HTML>");
+          client.stop();
+
+        }
+      }
+    }
+  }
+
+  keypad.getKey();
+  //   movePulse_1000();
+}
+
+/*void movePulse_1000(){
+    Serial.print("Start movePulse_1000()\t\t");
+    for (int pulseCounter=0; pulseCounter<=150; pulseCounter++){
+        digitalWrite(3,LOW);
+        delay(20); // between pulses
+        digitalWrite(3,HIGH);
+       // delayMicroseconds(1000);
+    }
+    Serial.println("End movePulse_1000()");
+  }*/
+
+void keypadEvent(KeypadEvent eKey) {
+  switch (keypad.getState()) {
+    case PRESSED:
+      Serial.print("Pressed: ");
+      Serial.println(eKey);
+         data_count++;
+      Serial.println(data_count);
+
+      switch (eKey) {
+        case '*': checkPassword(); break;
+        case '#': password.reset(); break;
+        default: password.append(eKey);
+      }
+  }
+}
+
+void checkPassword() {
+  if (password.evaluate()) {
+    Serial.println("Success");
+    myservo.write(0);
+    delay(2000);
+    myservo.write(100);
+   
+    data_count = 0;
+  }
+  else {
+    Serial.println("Wrong");
+    myservo.write(100);              // tell servo to go to position in variable 'pos'
+
+    data_count = 0;
+       
+  }
+}
